@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        /* ========================================== */
+        /* 1. 基礎全域樣式與環境初始化 */
+        /* ========================================== */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            justify-content: center; /* 確保主容器水平置中 */
+            align-items: center;     /* 確保主容器垂直置中 */
+            min-height: 100vh;
+        }
+
+        /* 遊戲主要外殼容器 - 絕對寬度鎖定 */
+        .game-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+            width: 930px; 
+            margin: 0 auto;          
+            text-align: center;
+        }
+
+        /* 畫面流暢切換控制 */
+        .screen {
+            display: none;
+            width: 100%;
+        }
+        .screen.active {
+            display: block;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        p {
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+            text-align: center;
+        }
+
+        /* 通用大按鈕 (主選單 / 結算畫面用) */
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: inline-block;
+        }
+        .btn:hover { background: #0056b3; }
+
+
+        /* ========================================== */
+        /* 2. 勘探車模式選擇介面排版 */
+        /* ========================================== */
+        .game-layout {
+            display: flex;
+            text-align: left;
+            margin: 20px auto 0 auto; 
+            width: 870px;       
+        }
+        .left-column {
+            width: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-right: 30px; 
+        }
+        .option-block {
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 12px 15px;
+            display: flex;
+            align-items: center;        
+            justify-content: space-between; 
+        }
+        .option-text {
+            color: #495057;
+            font-size: 15px;
+            line-height: 1.4;
+        }
+        .select-btn {
+            background: #28a745; 
+            color: white;
+            border: none;
+            width: 70px;        
+            height: 35px;       
+            border-radius: 4px;
+            cursor: pointer;
+            flex-shrink: 0;     
+        }
+        .select-btn:hover { background: #218838; }
+
+        .right-column {
+            width: 340px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+
+        /* ========================================== */
+        /* 3. 遊戲核心戰場雙欄排版 (狀態欄 + 8x8網格) */
+        /* ========================================== */
+        .play-layout {
+            display: flex;
+            justify-content: center; 
+            text-align: left;
+            margin: 20px auto 0 auto; 
+            width: 870px;            
+        }
+
+        /* 左側狀態欄 (寬度 240px) */
+        .status-bar {
+            width: 240px;
+            background: #343a40; 
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-right: 30px;      
+            flex-shrink: 0;          
+        }
+        .status-bar h3 {
+            border-bottom: 2px solid #495057;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .status-item {
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+
+        /* 右側 8*8 網格戰場容器 */
+        .grid-container {
+            width: 600px;
+            height: 600px; 
+            display: grid;
+            grid-template-columns: repeat(8, 1fr); 
+            grid-template-rows: repeat(8, 1fr);    
+            gap: 4px; 
+            background: #dee2e6;
+            padding: 4px;
+            border-radius: 8px;
+            flex-shrink: 0;          
+        }
+
+        /* 單個格子基礎視覺 */
+        .grid-cell {
+            background: #ffffff;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 28px; 
+            user-select: none; 
+        }
+
+        /* 神祕盲盒地圖迷霧狀態 */
+        .grid-cell.hidden-cell {
+            background: #2b2b2b !important; 
+            cursor: help;
+            color: #444;
+        }
+        .grid-cell.hidden-cell * {
+            display: none; 
+        }
+
+        /* 勘探小車高亮發光狀態 */
+        .grid-cell.player-on {
+            background: #e3f2fd !important; 
+            box-shadow: inset 0 0 0 3px #2196f3; 
+        }
+
+        /* 已洗劫、已走過的地圖足跡 */
+        .grid-cell.visited {
+            background: #f1f3f5; 
+        }
+
+
+        /* ========================================== */
+        /* 4. 冒險結束與大通關結算面板 */
+        /* ========================================== */
+        .result-box {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 30px;
+            max-width: 500px;
+            margin: 20px auto;
+        }
+        .stats-summary {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px dashed #ced4da;
+            margin: 20px 0;
+            text-align: left;
+            display: inline-block;
+            width: 250px;
+        }
+        .stats-summary p {
+            text-align: left;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+
+        /* ========================================== */
+        /* 5. 戰鬥與課金對話框 */
+        /* ========================================== */
+        .dialog-overlay,
+        .battle-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(12, 34, 56, 0.75); /* 深藍色半透明滿版磨砂遮罩 */
+            display: none;                      
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;                      
+        }
+
+        .dialog-overlay.active,
+        .battle-overlay.active {
+            display: flex;                 
+        }
+
+        /* 對話框主體：氣泡大圓角主窗 */
+        .battle-box {
+            background: linear-gradient(135deg, #ffffff 0%, #eef5fc 100%);
+            border: 4px solid #3a8ee6;          /* 經典天藍色重工業主框 */
+            border-radius: 20px;                
+            box-shadow: 0 12px 36px rgba(0, 142, 230, 0.4), inset 0 0 15px rgba(255,255,255,0.6);
+            width: 450px;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+            animation: dialogPop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* 頂部藝術字標題：黃色反光主色調 */
+        .battle-header {
+            font-size: 24px;
+            font-weight: bold;
+            color: #f39c12;                     
+            text-shadow: 2px 2px 0px #34495e, 0 0 8px rgba(243, 156, 18, 0.6);
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+
+        /* 內文文字排版描述 */
+        .battle-body p {
+            font-size: 16px;
+            color: #2c3e50;
+            line-height: 1.5;
+            margin-bottom: 30px;
+            font-weight: 500;
+        }
+
+        /* 底部功能性 3 按鈕對稱排列區 */
+        .battle-actions {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* ========================================== */
+        /* 核心修改：戰鬥選項膠囊按鈕（動態色彩配置） */
+        /* ========================================== */
+        .action-btn {
+            flex: 1;
+            padding: 12px 0;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 50px;                
+            cursor: pointer;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            transition: all 0.15s ease;
+
+            /* 預設狀態：所有可以點擊的按鈕統一為充滿戰鬥感的亮紅色 */
+            background: linear-gradient(to bottom, #ff4d4d, #c0392b);
+            border-bottom: 3px solid #962d22;
+        }
+
+        /* 可以點擊的按鈕懸停效果 */
+        .action-btn:not(:disabled):hover {
+            background: linear-gradient(to bottom, #ff6666, #d94332);
+            transform: translateY(-2px);
+        }
+
+        /* 當按鈕被滑鼠按壓下去時的手感 */
+        .action-btn:not(:disabled):active {
+            transform: translateY(1px);
+            border-bottom-width: 1px;
+        }
+
+        /* 核心新增：當按鈕被禁用（不能點擊）時，自動切換成低調灰色 */
+        .action-btn:disabled {
+            background: #bdc3c7 !important; 
+            border-bottom: 3px solid #95a5a6 !important;
+            color: #7f8c8d !important;
+            cursor: not-allowed !important;
+            transform: none !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+        }
+
+
+        /* 彈出彈窗的立體縮放小動畫 */
+        @keyframes dialogPop {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+        
+        <!-- 1. 開始遊戲畫面 -->
+        <div id="start-screen" class="screen active">
+            <h1>祕寶車隊 喊你開車</h1>
+            <p>全新組建的祕寶車隊發現了豐富的寶藏埋藏地，</p>
+            <p>現在加入車隊裝備，即可獲得大量獎勵。</p>
+            <button class="btn" id="start-btn">進入藏寶地</button>
+        </div>
+        
+        <!-- 2. 選擇勘探車 -->
+        <div id="game-screen" class="screen">
+            <h1>勘探車費用全面降低</h1>
+            <p id="game-question">請選擇本次使用的勘探車：</p>
+            
+            <div class="game-layout">
+                <div class="left-column">
+                    <div class="option-block">
+                        <span class="option-text">[砲灰]勘探車</span>
+                        <p>燃油30, 裝甲值2</p>
+                        <p>免費</p>
+                        <button class="select-btn" data-choice="1">選擇</button>
+                    </div>
+                    <div class="option-block">
+                        <span class="option-text">[酋長]勘探車</span>
+                        <p>燃油45, 裝甲值6</p>
+                        <p>售價：新台幣 10元</p>
+                        <button class="select-btn" data-choice="2">選擇</button>
+                    </div>
+                    <div class="option-block">
+                        <span class="option-text">[好運]勘探車</span>
+                        <p>燃油60, 裝甲值13</p>
+                        <p>售價：新台幣 78元</p>
+                        <button class="select-btn" data-choice="3">選擇</button>
+                    </div>
+                    <div class="option-block">
+                        <span class="option-text">[老司機]勘探車</span>
+                        <p>燃油80, 裝甲值21<br>有武器裝備</p>
+                        <p>售價：新台幣 168元</p>
+                        <button class="select-btn" data-choice="4">選擇</button>
+                    </div>
+                </div>
+            
+                <div class="right-column">
+                    <h3>藏寶地簡介</h3>
+                    <br>
+                    <p><b>第一層：</b> 有金幣和紅寶石，怪物很少，運氣不要太差就不會太慘</p>
+                    <br>
+                    <p><b>第二層：</b> 危機四伏，怪物數量增加，但紅寶石的現身機率提高，運氣好能發現鑽石。</p>
+                    <br>
+                    <p><b>第三層：</b> 終極考驗，尋找最終傳送出口，傳聞有極其稀有的鑽石！</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 遊戲中核心戰場 -->
+        <div id="play-screen" class="screen">
+            <h1 id="floor-title">核心戰場 - 第 1 層</h1>
+            <div class="play-layout">
+                
+                <!-- 左側狀態欄 -->
+                <div class="status-bar">
+                    <!-- 🛠️ 1. 冒險狀態改為動態車輛狀態標題 -->
+                    <h3 id="status-car-title">勘探車狀態</h3>
+                    <div class="status-item">裝甲值: <span id="status-hp">0</span></div>
+                    <div class="status-item">剩餘燃料⛽: <span id="status-fuel">0</span></div>
+                    
+                    <div class="status-item" style="border-top: 1px solid #495057; padding-top: 10px; margin-top: 10px;"><b>本層收穫：</b></div>
+                    <div class="status-item">金幣 🪙: <span id="status-coins">0</span></div>
+                    <div class="status-item">紅寶石 🔻: <span id="status-rubies">0</span></div>
+                    <div class="status-item">鑽石 💎: <span id="status-diamonds">0</span></div>
+                    
+                    <div class="status-item" style="border-top: 1px solid #495057; padding-top: 10px; margin-top: 10px;">目前層數: <span id="status-floor">1</span> / 3</div>
+                    <div class="status-item">操作: <b style="color: #ffc107;">W A S D 控制</b></div>
+                    
+                    <div class="status-item" id="log-box" style="margin-top:15px; font-size:13px; color:#bbb; line-height:1.4;">
+                        探索開始...
+                    </div>
+                </div>
+
+                <!-- 右側 8*8 遊戲網格 -->
+                <div id="grid-container" class="grid-container"></div>
+
+            </div>
+        </div>
+
+        <!-- 4. 遊戲結束/獲勝結算畫面 -->
+        <div id="result-screen" class="screen">
+            <h1 id="result-title">遊戲結束</h1>
+            <div class="result-box">
+                <p id="result-desc">結算內文載入中...</p>
+                <div class="stats-summary">
+                    <p>🪙 金幣收集: <span id="final-coins">0</span></p>
+                    <p>🔻 紅寶石收集: <span id="final-rubies">0</span></p>
+                    <p>💎 鑽石收集: <span id="final-diamonds">0</span></p>
+                </div>
+                <button class="btn" id="restart-btn" style="margin-top:20px;">重新開始</button>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- 遭遇怪物時的戰鬥對話框 -->
+    <div id="battle-dialog-overlay" class="battle-overlay">
+        <div class="battle-box">
+            <div class="battle-header">魔龍襲擊</div>
+            <div class="battle-body">
+                <p id="battle-message">⚠️ 你在藏寶地被地獄魔龍獸襲擊</p>
+            </div>
+            <!-- 🛠️ 統一色調按鈕區 -->
+            <div class="battle-actions">
+                <button class="action-btn" id="action-fight">拼命</button>
+                <button class="action-btn" id="action-escape">逃跑</button>
+                <button class="action-btn" id="action-shoot">開炮</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 燃料耗盡時儲值加油對話框 -->
+    <div id="fuel-dialog-overlay" class="battle-overlay">
+        <div class="battle-box" style="border-color: #28a745;">
+            <div class="battle-header" style="color: #28a745; text-shadow: 2px 2px 0px #34495e;">⛽ 警告：燃料耗盡</div>
+            <div class="battle-body">
+                <p id="fuel-message">小車的燃料已經完全耗盡，無法繼續前進！</p>
+            </div>
+            <div class="battle-actions">
+                <button class="action-btn" id="action-refuel" style="background: linear-gradient(to bottom, #2ecc71, #27ae60); border-bottom: 3px solid #219653; flex: 1.3;">儲值補滿油箱</button>
+                <button class="action-btn" id="action-giveup" style="background: linear-gradient(to bottom, #95a5a6, #7f8c8d); border-bottom: 3px solid #616c6d;">放棄探險</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. DOM 元素宣告與綁定
+        // ==========================================
+        const startScreen = document.getElementById('start-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const playScreen = document.getElementById('play-screen');
+        const resultScreen = document.getElementById('result-screen');
+        const battleOverlay = document.getElementById('battle-dialog-overlay');
+
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const selectBtns = document.querySelectorAll('.select-btn');
+        const gridContainer = document.getElementById('grid-container');
+
+        // 狀態欄元件
+        const statusBarTitle = document.querySelector('.status-bar h3'); 
+        const floorTitle = document.getElementById('floor-title');
+        const statusHp = document.getElementById('status-hp');
+        const statusFuel = document.getElementById('status-fuel');
+        const statusCoins = document.getElementById('status-coins');
+        const statusRubies = document.getElementById('status-rubies');
+        const statusDiamonds = document.getElementById('status-diamonds');
+        const statusFloor = document.getElementById('status-floor');
+        const logBox = document.getElementById('log-box');
+
+        // 結算畫面元件
+        const resultTitle = document.getElementById('result-title');
+        const resultDesc = document.getElementById('result-desc');
+        const finalCoins = document.getElementById('final-coins');
+        const finalRubies = document.getElementById('final-rubies');
+        const finalDiamonds = document.getElementById('final-diamonds');
+
+        // ==========================================
+        // 2. 遊戲核心狀態變數
+        // ==========================================
+        let playerPos = { row: 4, col: 4 };
+        let isGameActive = false; 
+        let isDialogOpen = false;  
+
+        let hp = 100;
+        let maxHp = 100;    
+        let fuel = 40;            
+        let maxFuel = 40;   
+        let currentFloor = 1;
+
+        let selectedCarChoice = "1"; 
+        let selectedCarName = ""; 
+        let refuelCost = 10;         
+
+        // 每層收集計數器 (換層歸零)
+        let floorHarvest = { coins: 0, rubies: 0, diamonds: 0 };
+        // 全域累計收穫計數器 (結算顯示)
+        let totalHarvest = { coins: 0, rubies: 0, diamonds: 0 };
+
+        const mapData = {};    
+        const fogData = {};    
+
+        // ==========================================
+        // 3. 基礎畫面切換與車輛屬性初始化
+        // ==========================================
+        if (startBtn) {
+            startBtn.addEventListener('click', () => {
+                startScreen.classList.remove('active');
+                gameScreen.classList.add('active');
+            });
+        }
+
+        if (restartBtn) {
+            restartBtn.addEventListener('click', () => {
+                resultScreen.classList.remove('active');
+                startScreen.classList.add('active');
+            });
+        }
+
+        selectBtns.forEach(button => {
+            button.addEventListener('click', (e) => {
+                selectedCarChoice = e.target.getAttribute('data-choice');
+                
+                // 載入對應車輛初始狀態
+                if (selectedCarChoice === "1") {
+                    selectedCarName = "[砲灰]勘探車";
+                    maxFuel = 30; maxHp = 2; refuelCost = 10;
+                } else if (selectedCarChoice === "2") {
+                    selectedCarName = "[酋長]勘探車";
+                    maxFuel = 45; maxHp = 6; refuelCost = 30;
+                } else if (selectedCarChoice === "3") {
+                    selectedCarName = "[好運]勘探車";
+                    maxFuel = 60; maxHp = 13; refuelCost = 40;
+                } else if (selectedCarChoice === "4") {
+                    selectedCarName = "[老司機]勘探車";
+                    maxFuel = 80; maxHp = 21; refuelCost = 60;
+                }
+
+                hp = maxHp;
+                fuel = maxFuel;
+
+                gameScreen.classList.remove('active');
+                playScreen.classList.add('active');
+                
+                currentFloor = 1;
+                totalHarvest = { coins: 0, rubies: 0, diamonds: 0 };
+                
+                startNewFloor();
+            });
+        });
+
+        // ==========================================
+        // 4. 地牢新樓層初始化與隨機地圖生成
+        // ==========================================
+        function startNewFloor() {
+            playerPos = { row: 4, col: 4 };
+            isGameActive = true;
+            isDialogOpen = false;
+            floorHarvest = { coins: 0, rubies: 0, diamonds: 0 };
+
+            if (statusBarTitle) statusBarTitle.innerText = `${selectedCarName} 狀態`;
+            if (floorTitle) floorTitle.innerText = `核心戰場 - 第 ${currentFloor} 層`;
+            
+            updateStatUI();
+            updateHarvestUI();
+
+            if (logBox) logBox.innerText = `駕駛 ${selectedCarName} 進入第 ${currentFloor} 層藏寶地！請找出出口門🚪。`;
+
+            // 初始化迷霧
+            for (let r = 1; r <= 8; r++) {
+                for (let c = 1; c <= 8; c++) { fogData[`${r}-${c}`] = true; }
+            }
+            fogData["4-4"] = false;
+
+            generateFixedFloorItems();
+            renderGameBoard();
+        }
+
+        function updateStatUI() {
+            if (statusHp) statusHp.innerText = `${hp} / ${maxHp}`;
+            if (statusFuel) statusFuel.innerText = `${fuel} / ${maxFuel}`;
+            if (statusFloor) statusFloor.innerText = currentFloor;
+        }
+
+        function updateHarvestUI() {
+            if (statusCoins) statusCoins.innerText = floorHarvest.coins;
+            if (statusRubies) statusRubies.innerText = floorHarvest.rubies;
+            if (statusDiamonds) statusDiamonds.innerText = floorHarvest.diamonds;
+        }
+
+        function generateFixedFloorItems() {
+            const pool = ['🚪']; 
+            
+            if (currentFloor === 1) {
+                for (let i = 0; i < 2; i++)  pool.push('👾');
+                for (let i = 0; i < 10; i++) pool.push('🔻');
+                for (let i = 0; i < 20; i++) pool.push('🪙');
+            } else if (currentFloor === 2) {
+                for (let i = 0; i < 10; i++) pool.push('👾');
+                for (let i = 0; i < 5; i++)  pool.push('💎');
+                for (let i = 0; i < 20; i++) pool.push('🔻');
+                for (let i = 0; i < 20; i++) pool.push('🪙');
+            } else if (currentFloor === 3) {
+                for (let i = 0; i < 15; i++) pool.push('👾');
+                for (let i = 0; i < 20; i++) pool.push('💎');
+                for (let i = 0; i < 20; i++) pool.push('🔻');
+            }
+
+            while (pool.length < 63) {
+                pool.push('');
+            }
+
+            for (let i = pool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pool[i], pool[j]] = [pool[j], pool[i]];
+            }
+
+            let poolIndex = 0;
+            for (let r = 1; r <= 8; r++) {
+                for (let c = 1; c <= 8; c++) {
+                    const key = `${r}-${c}`;
+                    if (r === 4 && c === 4) {
+                        mapData[key] = '';
+                        continue;
+                    }
+                    mapData[key] = pool[poolIndex++];
+                }
+            }
+        }
+
+        function renderGameBoard() {
+            if (!gridContainer) return;
+            gridContainer.innerHTML = ''; 
+            
+            for (let r = 1; r <= 8; r++) {
+                for (let c = 1; c <= 8; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('grid-cell');
+                    const key = `${r}-${c}`;
+                    const itemOnCell = mapData[key];
+                    const isHidden = fogData[key];
+
+                    if (r === playerPos.row && c === playerPos.col) {
+                        cell.innerText = '🚗';
+                        cell.classList.add('player-on');
+                        fogData[key] = false; 
+
+                        if (itemOnCell !== '' && itemOnCell !== 'visited') {
+                            triggerCellEvent(itemOnCell, key);
+                        } else if (itemOnCell === '') {
+                            mapData[key] = 'visited';
+                        }
+                    } 
+                    else if (isHidden) {
+                        cell.classList.add('hidden-cell');
+                        cell.innerText = '?';
+                    } 
+                    else {
+                        if (itemOnCell === 'visited') {
+                            cell.classList.add('visited');
+                            cell.innerText = '';
+                        } else {
+                            cell.innerText = itemOnCell;
+                        }
+                    }
+                    gridContainer.appendChild(cell);
+                }
+            }
+        }
+
+        // ==========================================
+        // 5. 核心事件處理：踩寶藏、傳送門與全新戰鬥機制
+        // ==========================================
+        function triggerCellEvent(item, key) {
+            mapData[key] = 'visited'; // 踩過後地圖資料立刻清空標記為已探索
+
+            if (item === '🪙') {
+                floorHarvest.coins++; totalHarvest.coins++;
+                if (logBox) logBox.innerText = "獲得 金幣 🪙！"; updateHarvestUI();
+            } else if (item === '🔻') {
+                floorHarvest.rubies++; totalHarvest.rubies++;
+                if (logBox) logBox.innerText = "發現 紅寶石 🔻！"; updateHarvestUI();
+            } else if (item === '💎') {
+                floorHarvest.diamonds++; totalHarvest.diamonds++;
+                if (logBox) logBox.innerText = "幸運挖到 鑽石 💎！"; updateHarvestUI();
+            } 
+            // 遇到怪物：生命固定先 -1
+            else if (item === '👾') {
+                hp -= 1; 
+                if (hp <= 0) hp = 0;
+                updateStatUI();
+                if (logBox) logBox.innerText = "遭遇 魔獸 👾 襲擊！車體受損生命值 -1";
+
+                // 如果車體報廢則直接結束遊戲
+                if (hp <= 0) { 
+                    endGame(false); 
+                    return;
+                }
+
+                isGameActive = false; // 暫時鎖定外層地圖移動
+                isDialogOpen = true;  // 標記對話框開啟
+
+                const battleMessage = document.getElementById('battle-message');
+                if (battleMessage) {
+                    battleMessage.innerHTML = `⚠️ <b>你在藏寶地被地獄魔龍獸襲擊</b><br>車體受到受到攻擊，損失 1 點裝甲！如果你駕駛的是老司機勘探車，可以使用火炮擊退魔獸<br>請選擇你的應對策略：
+                    <br>拼命：硬懟是莽夫的行為，通常不會有好下場
+                    <br>逃跑：花費 15 點燃油可以脫離
+                    <br>開炮：沒有什麼是一砲解決不了的，如果有，那就兩炮`;
+                }
+                
+                if (battleOverlay) battleOverlay.classList.add('active');
+
+                const btnFight = document.getElementById('action-fight');
+                const btnEscape = document.getElementById('action-escape');
+                const btnShoot = document.getElementById('action-shoot');
+
+                // 克隆按鈕以清除舊的事件監聽器（防重複註冊 Bug）
+                const newFight = btnFight.cloneNode(true);
+                const newEscape = btnEscape.cloneNode(true);
+                const newShoot = btnShoot.cloneNode(true);
+                btnFight.parentNode.replaceChild(newFight, btnFight);
+                btnEscape.parentNode.replaceChild(newEscape, btnEscape);
+                btnShoot.parentNode.replaceChild(newShoot, btnShoot);
+
+                newFight.innerText = "拼命";
+                newFight.disabled = false;
+
+                newEscape.innerText = "逃跑";
+                newEscape.disabled = false;
+
+                newShoot.innerText = "開炮";
+                if (selectedCarChoice === "4") {
+                    newShoot.disabled = false; // 只有老司機亮起紅色可點擊
+                } else {
+                    newShoot.disabled = true;  // 其他車型變灰禁用
+                }
+
+                // --- 需求 1：[拼命] 按鈕點擊後，跳出對應的文字對話框確認 ---
+                newFight.addEventListener('click', () => {
+                    let lostCoins = Math.round(floorHarvest.coins * 0.3);
+                    let lostRubies = Math.round(floorHarvest.rubies * 0.3);
+                    let lostDiamonds = Math.round(floorHarvest.diamonds * 0.3);
+
+                    floorHarvest.coins -= lostCoins; totalHarvest.coins -= lostCoins;
+                    floorHarvest.rubies -= lostRubies; totalHarvest.rubies -= lostRubies;
+                    floorHarvest.diamonds -= lostDiamonds; totalHarvest.diamonds -= lostDiamonds;
+
+                    const msg = `⚔️<b>下次還是趕快逃命吧！</b> <br><br>你被地獄魔龍獸狠狠修理了一頓，<br>並被搶走了一部分財寶
+                    <br><br>下次記得，別莽了<br><br>損失財寶
+                    <br>🪙 金幣 x ${lostCoins}<br>🔻 紅寶石 x ${lostRubies}<br>💎 鑽石 x ${lostDiamonds}`;
+                    showNoticeDialog("戰鬥結果", msg);
+                });
+
+                // --- 需求 1：[逃跑] 按鈕點擊後，跳出對應的文字對話框確認 ---
+                newEscape.addEventListener('click', () => {
+                    fuel = Math.max(0, fuel - 15); 
+                    const msg = `🏃 <b>加足馬力逃跑！</b><br><br>你猛踩油門急速倒退，成功逃跑了！
+                    <br><br>不過猛烈倒車消耗了大量備用能源：<br>⛽ 燃料消耗 -15 點。`;
+                    showNoticeDialog("逃跑成功", msg);
+                });
+
+                // --- [開炮] 按鈕點擊後，跳出老司機主砲轟炸對話框 ---
+                newShoot.addEventListener('click', () => {
+                    const msg = `💥 <b>雷射主砲，轟隆發射！</b><br><br>老司機勘探車升起隱藏的主砲，一發威力強大的離子射線直接將前方怪物 👾 炸得粉碎！<br><br>車隊毫髮無傷，完美清除路障！`;
+                    showNoticeDialog("開炮轟炸", msg);
+                });
+            } 
+            // --- 需求 2：任一層抵達出口時跳出找到傳送門的對話框提示 ---
+            else if (item === '🚪') {
+                isGameActive = false;
+                isDialogOpen = true;
+
+                let doorMsg = "";
+                if (currentFloor < 3) {
+                    doorMsg = `🚪 <b>恭喜你找到本層出口！</b><br><br>點擊確認按鈕，準備加載進入下一層藏寶地。`;
+                    showNoticeDialog("找到出口", doorMsg, () => {
+                        currentFloor++;
+                        if (logBox) logBox.innerText = `進入第 ${currentFloor} 層...`;
+                        startNewFloor();
+                    });
+                } else {
+                    doorMsg = `🏁 <b>恭喜你找到本層出口！</b><br><br>天啊！前方的光芒就是通往地表世界的秘密隧道！你成功載著滿滿的車隊物資突破了所有限制！<br><br>準備進入勘探回報成果結算大畫面！`;
+                    showNoticeDialog("勘探大成功", doorMsg, () => {
+                        endGame(true);
+                    });
+                }
+            }
+        }
+
+        /**
+         * 核心功能：動態轉換彈窗為單一［確認］按鈕的文字通知框
+         */
+        function showNoticeDialog(title, message, customCallback = null) {
+            const battleHeader = document.querySelector('.battle-header');
+            const battleMessage = document.getElementById('battle-message');
+            if (battleHeader) battleHeader.innerText = title;
+            if (battleMessage) battleMessage.innerHTML = message;
+
+            // 🛠️ 關鍵修正：確保每次呼叫 showNoticeDialog 時，都會將對話框遮罩 active 顯示出來，防止畫面卡死！
+            if (battleOverlay) battleOverlay.classList.add('active');
+
+            const btnFight = document.getElementById('action-fight');
+            const btnEscape = document.getElementById('action-escape');
+            const btnShoot = document.getElementById('action-shoot');
+
+            const newFight = btnFight.cloneNode(true);
+            const newEscape = btnEscape.cloneNode(true);
+            const newShoot = btnShoot.cloneNode(true);
+            btnFight.parentNode.replaceChild(newFight, btnFight);
+            btnEscape.parentNode.replaceChild(newEscape, btnEscape);
+            btnShoot.parentNode.replaceChild(newShoot, btnShoot);
+
+            // 重新裝飾按鈕：只留一個紅色的確認按鈕，其餘變灰禁用
+            newFight.innerText = "確認";
+            newFight.disabled = false; // 紅色點擊生效
+
+            newEscape.innerText = "-";
+            newEscape.disabled = true;  // 灰色禁用
+
+            newShoot.innerText = "-";
+            newShoot.disabled = true;   // 灰色禁用
+
+            // 監聽單一確認按鈕
+            newFight.addEventListener('click', () => {
+                // 🛠️ 關鍵修正 1：必須【先】徹底關閉遮罩與解除對話框標記，還原全域變數
+                if (battleOverlay) battleOverlay.classList.remove('active');
+                if (battleHeader) battleHeader.innerText = "魔龍襲擊"; 
+                isDialogOpen = false; 
+
+                // 🛠️ 關鍵修正 2：利用 if-else 分流，若是換層，【只】執行換層邏輯，絕不混用到 resolveBattle()
+                if (customCallback) {
+                    // 延遲 50 毫秒執行，給瀏覽器 DOM 渲染畫面關閉的時間，確保狀態完全同步
+                    setTimeout(() => {
+                        customCallback();
+                    }, 50);
+                } else {
+                    // 如果是一般遭遇怪物事件（拼命/逃跑/開炮）後的收尾與燃油檢查
+                    resolveBattle();
+                }
+            });
+        }
+
+        function resolveBattle() {
+            // 再次確保對話框是關閉的
+            if (battleOverlay) battleOverlay.classList.remove('active'); 
+            isDialogOpen = false;               
+            updateStatUI();
+            updateHarvestUI();
+
+            // 檢查燃料：若逃跑導致油量見底，立即轉接儲值加油對話框
+            if (fuel <= 0) {
+                fuel = 0;
+                updateStatUI();
+                showRefuelDialog();
+            } else {
+                isGameActive = true;            
+                renderGameBoard();              
+            }
+        }
+
+        // ==========================================
+        // 6. 新台幣課金加油彈出對話框系統
+        // ==========================================
+        function showRefuelDialog() {
+            isGameActive = false;
+            isDialogOpen = true;
+
+            const battleHeader = document.querySelector('.battle-header');
+            if (battleHeader) battleHeader.innerText = "燃料耗盡";
+
+            const battleMessage = document.getElementById('battle-message');
+            if (battleMessage) {
+                battleMessage.innerHTML = `⛽ <b>勘探車油箱見底！</b><br><br>當前剩餘燃料已耗盡！是否花費 <b style="color:#e74c3c;">新台幣 ${refuelCost} 元</b> 為您的 ${selectedCarName} 重新加滿燃油繼續勘探？`;
+            }
+
+            if (battleOverlay) battleOverlay.classList.add('active');
+
+            const btnFight = document.getElementById('action-fight');
+            const btnEscape = document.getElementById('action-escape');
+            const btnShoot = document.getElementById('action-shoot');
+
+            const newFight = btnFight.cloneNode(true);
+            const newEscape = btnEscape.cloneNode(true);
+            const newShoot = btnShoot.cloneNode(true);
+            btnFight.parentNode.replaceChild(newFight, btnFight);
+            btnEscape.parentNode.replaceChild(newEscape, btnEscape);
+            btnShoot.parentNode.replaceChild(newShoot, btnShoot);
+
+            // 儲值加油選單的外觀：兩紅一灰，第三個變灰色 "-"
+            newFight.innerText = "儲值加滿";
+            newFight.disabled = false; 
+
+            newEscape.innerText = "放棄勘探";
+            newEscape.disabled = false; 
+            
+            newShoot.innerText = "-";
+            newShoot.disabled = true;   
+            newShoot.style.display = "block"; 
+
+            // 點選儲值加滿
+            newFight.addEventListener('click', () => {
+                if (battleHeader) battleHeader.innerText = "遭遇戰鬥"; 
+                fuel = maxFuel;
+                logBox.innerText = `💳 儲值成功！已花費 NT$ ${refuelCost} 元將油箱補滿！`;
+                if (battleOverlay) battleOverlay.classList.remove('active');
+                isDialogOpen = false;
+                isGameActive = true;
+                updateStatUI();
+                renderGameBoard();
+            });
+
+            // 點選放棄勘探
+            newEscape.addEventListener('click', () => {
+                if (battleHeader) battleHeader.innerText = "遭遇戰鬥"; 
+                if (battleOverlay) battleOverlay.classList.remove('active');
+                isDialogOpen = false;
+                endGame(false, "fuel");
+            });
+        }
+
+        // ==========================================
+        // 7. 終局結算與畫面處理
+        // ==========================================
+        function endGame(isVictory, reason = "") {
+            isGameActive = false;
+            isDialogOpen = false;
+            if (playScreen) playScreen.classList.remove('active');
+            if (resultScreen) resultScreen.classList.add('active');
+
+            if (isVictory) {
+                if (resultTitle) {
+                    resultTitle.innerText = "🎉 恭喜成功逃脫！";
+                    resultTitle.style.color = "#28a745";
+                }
+                if (resultDesc) resultDesc.innerText = `你成功駕駛 ${selectedCarName} 闖過了三層勘探藏寶地！本次勘探獎勵收穫：`;
+            } else {
+                if (resultTitle) {
+                    resultTitle.innerText = "💀 勘探結束";
+                    resultTitle.style.color = "#dc3545";
+                }
+                if (resultDesc) {
+                    resultDesc.innerText = `鑒於你的表現，你可能開了部假車，不過還算有點收穫。
+                    \n請繼續努力，下次爭取更好的成績吧!!
+                    \n\n本次勘探獎勵收穫：`;
+                }
+            }
+
+            if (finalCoins) finalCoins.innerText = Math.max(0, totalHarvest.coins);
+            if (finalRubies) finalRubies.innerText = Math.max(0, totalHarvest.rubies);
+            if (finalDiamonds) finalDiamonds.innerText = Math.max(0, totalHarvest.diamonds);
+        }
+
+        // ==========================================
+        // 8. 鍵盤監聽事件整合 (WASD 行動與即時扣油)
+        // ==========================================
+        window.addEventListener('keydown', (e) => {
+            // 核心安全鎖：非進行中狀態或開啟彈出選單時，完全不回應鍵盤指令
+            if (!isGameActive || isDialogOpen) return; 
+
+            const key = e.key.toLowerCase();
+            let nextRow = playerPos.row;
+            let nextCol = playerPos.col;
+
+            if (key === 'w') nextRow--;      
+            else if (key === 's') nextRow++; 
+            else if (key === 'a') nextCol--; 
+            else if (key === 'd') nextCol++; 
+            else return;                     
+
+            if (nextRow >= 1 && nextRow <= 8 && nextCol >= 1 && nextCol <= 8) {
+                
+                // 行動前防禦判定
+                if (fuel <= 0) {
+                    fuel = 0;
+                    updateStatUI();
+                    showRefuelDialog();
+                    return;
+                }
+
+                fuel--;
+                if (statusFuel) statusFuel.innerText = `${fuel} / ${maxFuel}`;
+
+                playerPos.row = nextRow;
+                playerPos.col = nextCol;
+                
+                // 渲染下一格畫面並執行踩格邏輯
+                renderGameBoard();
+
+                // 移動完成的即時燃料判定
+                const nextCellItem = mapData[`${playerPos.row}-${playerPos.col}`];
+                if (fuel === 0 && nextCellItem !== '🚪') {
+                    showRefuelDialog();
+                }
+            }
+        });
+
+    </script>
+</body>
+</html>
